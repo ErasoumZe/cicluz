@@ -7,3 +7,18 @@ build
 server/public
 vite.config.ts.*
 *.tar.gz
+# Node
+node_modules
+dist
+build
+
+# Env
+.env
+.env.*
+
+# Replit / local
+.replit
+.local/
+
+# OS
+.DS_Store
