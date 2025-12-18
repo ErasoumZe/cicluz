@@ -11,6 +11,7 @@ E o `npm run start` serve tudo em uma unica porta (`PORT` do ambiente).
 ### Render
 
 - Use o blueprint `render.yaml` na raiz do repo (Deploy via Blueprint).
+- Este repo inclui `.npmrc` com `include=dev` para garantir que o build funcione mesmo quando o Render usa `npm install` com `NODE_ENV=production` (precisa de `tsx/vite/esbuild` no build).
 - Configure as variaveis de ambiente no servico:
   - `DATABASE_URL` (Postgres)
   - `SUPABASE_URL`
