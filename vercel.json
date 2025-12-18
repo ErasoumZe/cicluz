@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "installCommand": "npm ci --include=dev",
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist/public",
@@ -9,7 +8,7 @@
       "destination": "https://cicluz-backend.onrender.com/api/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]
