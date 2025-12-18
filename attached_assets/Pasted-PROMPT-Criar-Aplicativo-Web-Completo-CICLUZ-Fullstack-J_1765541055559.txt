@@ -1,0 +1,317 @@
+PROMPT — Criar Aplicativo Web Completo CICLUZ (Fullstack JavaScript)
+
+Quero que você gere todo o código de um aplicativo web chamado CICLUZ, baseado na metodologia oficial do PDF que vou descrever abaixo. Use a arquitetura:
+
+Frontend: React.js + Vite
+
+Backend: Node.js + Express
+
+Banco: PostgreSQL (pode usar Prisma ORM)
+
+IA: integração via API (OpenAI ou Replit AI)
+
+Autenticação: JWT
+
+Estilo: TailwindCSS
+
+Design baseado na marca CICLUZ (cores multicoloridas do logo + tipografia clean)
+
+Estruture o projeto em duas pastas:
+
+/client
+/server
+
+1. Identidade da Marca CICLUZ
+
+Use esta imagem como base visual da interface:
+"/mnt/data/Cicluz-Logotipo-Final-CMYK_02-Logotipo-Horizontal-Policromia-Fundo-Claro.jpg"
+
+Diretrizes:
+
+layout leve, espaçoso, acolhedor
+
+cores do gradiente do símbolo
+
+muitos círculos, bordas suaves, efeitos de fluxo
+
+fontes finas e elegantes
+
+UI emocional, fluida, terapêutica
+
+2. Metodologia Oficial CICLUZ
+
+Baseie TODA a lógica da IA e dos módulos no PDF:
+"/mnt/data/CICLUZ_Metodologia_Aplicativo_Autoajuda.pdf" 
+
+CICLUZ_Metodologia_Aplicativo_A…
+
+O método integra:
+
+Psicologia Corporal (Lowen)
+
+Constelação Familiar (Hellinger)
+
+Programação Neurolinguística
+
+Coaching Clássico
+
+E usa os nove níveis de consciência CICLUZ, que deverão guiar todos os diagnósticos:
+
+Intenção
+
+Comportamento
+
+Capacidades
+
+Crenças
+
+Características (Luz/Sombra)
+
+Necessidades Básicas
+
+Sonhos e Realização
+
+Propósito e Legado
+
+Espiritualidade (Amor Próprio)
+
+3. Estrutura completa do aplicativo que você deve implementar
+
+A seguir está toda a arquitetura do app. Crie cada módulo com páginas, APIs, banco e integração com IA.
+
+⭐ Tarefa principal: Construir APP CICLUZ com 6 módulos
+MÓDULO 1 — TELA INICIAL / DASHBOARD
+
+Funcionalidades:
+
+Energia emocional do dia (mapa emocional S+ / IS−)
+
+Sugestões inteligentes (IA)
+
+Botão rápido “Meu Diário”
+
+Botão “Consultório Virtual”
+
+Progresso semanal
+
+Vídeo recomendado do dia
+
+Backend: rota /api/dashboard
+
+MÓDULO 2 — CONSULTÓRIO VIRTUAL (núcleo do app)
+2.1 Questionário Inteligente CICLUZ
+
+Criar sistema de perguntas dinâmicas baseadas nos quatro pilares:
+
+Corpo: tensões, respiração, posturas
+
+Sistema familiar
+
+Crenças (PNL)
+
+Direção/Ação (Coaching)
+
+A lógica deve ter RAMOS:
+
+Se usuário relata ansiedade → ativar módulo corporal (Lowen)
+
+Se relata repetição familiar → ativar módulo sistêmico (Hellinger)
+
+Se relata crença limitante → ativar módulo PNL
+
+Se relata paralisia / falta de direção → ativar Coaching
+
+2.2 IA deve analisar e responder em quatro camadas:
+
+Comportamental
+
+Emocional (S+ e IS−)
+
+Sistêmico
+
+Corporal
+
+Gerar relatório com:
+
+intenção predominante
+
+crença principal
+
+necessidade ativada
+
+traço de personalidade dominante
+
+padrões sistêmicos
+
+tensões físicas possíveis
+
+2.3 Prescrição Inteligente
+
+IA recomenda:
+
+vídeos
+
+exercícios corporais
+
+práticas PNL
+
+meditações
+
+ações semanais
+
+Backend: /api/consultorio/*
+
+MÓDULO 3 — TRILHAS TERAPÊUTICAS (Vídeos Profissionais)
+
+Agrupamentos:
+
+Cura emocional
+
+Relações familiares
+
+Prosperidade e realização
+
+Corpo e respiração
+
+Propósito e legado
+
+Sombra e Luz
+
+Backend: /api/videos
+Frontend: página de trilhas + player de vídeo.
+
+MÓDULO 4 — AGENDA INTELIGENTE
+
+A agenda deve:
+
+Ler humor, crenças, comportamento, padrões emocionais
+
+Oferecer tarefas diárias personalizadas
+
+Gerar alertas emocionais
+
+Prever queda emocional com base em IS− acumulado
+
+Backend: /api/agenda
+Banco: tabela agenda_tasks
+
+MÓDULO 5 — DIÁRIO PERSONALIZADO CICLUZ
+
+Registros:
+
+Emocional (S+ / IS−)
+
+Corporal (tensão, respiração)
+
+Sistêmico (relações)
+
+Cognitivo (crenças)
+
+A IA deve identificar:
+
+gatilhos
+
+repetições
+
+temas ocultos
+
+necessidades básicas
+
+evolução emocional
+
+traços de personalidade
+
+Backend: /api/diario
+Banco: tabela diario_entries
+
+MÓDULO 6 — MAPA MENTAL DO USUÁRIO
+
+Quatro eixos:
+
+Eu
+
+Relações
+
+Realização
+
+Propósito
+
+Mapa deve ser gerado dinamicamente com base no histórico.
+
+Backend: /api/mapa
+
+4. Estrutura de Banco de Dados (PostgreSQL)
+
+Sugestão de tabelas:
+
+users
+dashboard_state
+diario_entries
+questionnaire_answers
+ia_reports
+videos
+agenda_tasks
+trilhas
+mapa_state
+
+
+Use Prisma para schema automático.
+
+5. IA — Regras internas obrigatórias
+
+O modelo deve seguir sempre:
+
+padrões S+ (emoções positivas primárias)
+
+padrões IS− (emoções negativas primárias)
+
+nove níveis de consciência CICLUZ
+
+quatro escolas terapêuticas
+
+lógica sistêmica (pertencimento, ordem, equilíbrio)
+
+A saída da IA deve sempre retornar:
+
+{
+  nivelPredominante,
+  emocaoCentral,
+  necessidadeBasica,
+  tracoPersonalidade,
+  padraoSistemico,
+  tensaoCorporal,
+  recomendacoes: [...]
+}
+
+6. O que o Replit deve gerar
+
+Todo o código do frontend React
+
+Todo o backend Express
+
+Todas as APIs
+
+O banco Prisma
+
+Uma UI bonita baseada na marca CICLUZ
+
+Integração com IA
+
+Lógica de questionário dinâmico
+
+Dashboard funcional
+
+Diário, agenda, trilhas, mapa mental
+
+Arquitetura limpa, modular e documentada
+
+IMPORTANTE
+
+O código deve vir totalmente funcional, organizado e pronto para rodar no Replit com:
+
+npm install
+npm run dev
+
+
+FIM DO PROMPT.
+Gere tudo exatamente conforme especificado.

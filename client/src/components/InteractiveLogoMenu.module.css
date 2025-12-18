@@ -1,0 +1,186 @@
+.container {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(
+      1200px 700px at 50% 28%,
+      hsl(var(--cicluz-purple) / 0.12),
+      transparent 58%
+    ),
+    radial-gradient(
+      900px 650px at 72% 70%,
+      hsl(var(--cicluz-teal) / 0.12),
+      transparent 58%
+    ),
+    linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
+}
+
+.container[data-mode="embedded"] {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.logo {
+  width: min(92vw, 72vh);
+  height: min(72vh, 680px);
+  max-height: 72vh;
+}
+
+.container[data-mode="embedded"] .logo {
+  width: min(100%, 440px);
+  height: min(42vh, 440px);
+  max-height: 42vh;
+}
+
+/* Consultorio: sem outline do logo, com icones sempre visiveis */
+.container[data-mode="embedded"] .baseStroke {
+  opacity: 0;
+}
+
+.container[data-mode="embedded"] .segmentFill,
+.container[data-mode="embedded"] .segmentOutline {
+  display: none;
+}
+
+.container[data-mode="embedded"] .playStroke {
+  opacity: 0;
+}
+
+.container[data-mode="embedded"] .iconWrap {
+  opacity: 1;
+  transform: scale(1);
+  filter: drop-shadow(0 10px 28px hsl(var(--glow) / 0.12));
+}
+
+.container[data-mode="embedded"] .segmentActive .iconWrap {
+  transform: scale(1.07);
+  filter: drop-shadow(0 14px 40px hsl(var(--glow) / 0.28));
+}
+
+.container[data-mode="embedded"] .iconBg {
+  fill: hsl(var(--background) / 0.78);
+  stroke: hsl(var(--border) / 0.72);
+}
+
+.container[data-mode="embedded"] .iconStroke {
+  stroke: hsl(var(--foreground) / 0.92);
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.baseStroke {
+  stroke: hsl(var(--foreground) / 0.38);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  pointer-events: none;
+}
+
+.playStroke {
+  stroke: hsl(var(--foreground) / 0.38);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  pointer-events: none;
+}
+
+.segment {
+  cursor: pointer;
+  outline: none;
+}
+
+.segmentActive {
+}
+
+.segment[data-segment="eu"] {
+  --glow: var(--cicluz-purple);
+}
+.segment[data-segment="ser"] {
+  --glow: var(--cicluz-blue);
+}
+.segment[data-segment="ter"] {
+  --glow: var(--cicluz-green);
+}
+
+.hit {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.segmentFill {
+  opacity: 0;
+  transition: opacity 180ms ease-out, filter 180ms ease-out;
+  pointer-events: none;
+}
+
+.segmentOutline {
+  opacity: 0;
+  transition: opacity 180ms ease-out, filter 180ms ease-out;
+  pointer-events: none;
+}
+
+.segmentActive .segmentFill {
+  opacity: 0.22;
+  filter:
+    drop-shadow(0 8px 24px hsl(var(--glow) / 0.28))
+    drop-shadow(0 0 56px hsl(var(--glow) / 0.22));
+}
+
+.segmentActive .segmentOutline {
+  opacity: 0.65;
+  filter:
+    drop-shadow(0 8px 24px hsl(var(--glow) / 0.28))
+    drop-shadow(0 0 56px hsl(var(--glow) / 0.22));
+}
+
+.iconWrap {
+  opacity: 0;
+  transform: scale(0.92);
+  transform-origin: center;
+  transform-box: fill-box;
+  transition:
+    opacity 160ms ease-out,
+    transform 160ms ease-out,
+    filter 160ms ease-out;
+  pointer-events: none;
+}
+
+.segmentActive .iconWrap {
+  opacity: 1;
+  transform: scale(1);
+  filter: drop-shadow(0 12px 32px hsl(var(--glow) / 0.22));
+}
+
+.iconBg {
+  fill: hsl(var(--background) / 0.72);
+  stroke: hsl(var(--border) / 0.7);
+  stroke-width: 1.2;
+}
+
+.iconStroke {
+  stroke: hsl(var(--foreground) / 0.9);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmentFill,
+  .segmentOutline,
+  .iconWrap {
+    transition: none;
+  }
+  .iconWrap {
+    transform: none;
+  }
+}
