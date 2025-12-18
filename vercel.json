@@ -1,10 +1,19 @@
 {
-  "buildCommand": "npm run build",
+  "version": 2,
+  "installCommand": "npm ci --include=dev",
+  "buildCommand": "npm run build:client",
   "outputDirectory": "dist/public",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "https://YOUR-RENDER-SERVICE.onrender.com/api/:path*"
+      "src": "/api/(.*)",
+      "dest": "https://cicluz-backend.onrender.com/api/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }

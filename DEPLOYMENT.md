@@ -35,6 +35,10 @@ O frontend usa URLs relativas `/api/*`. Para isso funcionar com backend separado
 ### Vercel (frontend)
 
 - Configure o projeto apontando para a raiz do repo.
-- Build Command: `npm run build`
+- Build Command: `npm run build:client`
+- Install Command (se precisar): `npm ci --include=dev`
 - Output Directory: `dist/public`
 - Ajuste `vercel.json` substituindo `YOUR-RENDER-SERVICE` pela URL real do seu servico no Render.
+- Configure envs no Vercel:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
