@@ -1,15 +1,8 @@
 {
-  "installCommand": "npm ci --include=dev",
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "dist/public",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://cicluz-backend.onrender.com/api/:path*"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "source": "/(.*)",
+      "destination": "/public/index.html"
     }
   ]
 }
