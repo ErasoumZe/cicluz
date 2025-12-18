@@ -2,12 +2,10 @@ services:
   - type: web
     name: cicluz
     env: node
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start
     autoDeploy: true
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: SESSION_SECRET
         generateValue: true
       - key: DATABASE_URL
