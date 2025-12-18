@@ -1,11 +1,13 @@
 {
   "version": 2,
+  "installCommand": "npm ci --include=dev",
   "builds": [
     {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist/public"
+        "distDir": "dist/public",
+        "buildCommand": "npm run vercel-build"
       }
     }
   ],
