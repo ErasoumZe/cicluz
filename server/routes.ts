@@ -1,4 +1,4 @@
-import type { Express } from "express";
+﻿import type { Express, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { randomUUID } from "crypto";
 import { z } from "zod";
@@ -9,7 +9,7 @@ import {
   SignJWT,
 } from "jose";
 
-import { storage } from "./storage.memory";
+import { storage } from "./storage";
 import {
   authMiddleware,
   hashPassword,
@@ -176,17 +176,17 @@ export async function registerRoutes(
     try {
       const parsed = registerSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: "Dados inválidos" });
+        return res.status(400).json({ message: "Dados invÃ¡lidos" });
       }
 
       const { email, username, password, name } = parsed.data;
 
       if (await storage.getUserByEmail(email)) {
-        return res.status(400).json({ message: "Email já cadastrado" });
+        return res.status(400).json({ message: "Email jÃ¡ cadastrado" });
       }
 
       if (await storage.getUserByUsername(username)) {
-        return res.status(400).json({ message: "Usuário já existe" });
+        return res.status(400).json({ message: "UsuÃ¡rio jÃ¡ existe" });
       }
 
       const hashedPassword = await hashPassword(password);
@@ -229,14 +229,14 @@ export async function registerRoutes(
     try {
       const parsed = loginSchema.safeParse(req.body);
       if (!parsed.success) {
-        return res.status(400).json({ message: "Dados inválidos" });
+        return res.status(400).json({ message: "Dados invÃ¡lidos" });
       }
 
       const { email, password } = parsed.data;
       const user = await storage.getUserByEmail(email);
 
       if (!user || !(await comparePassword(password, user.password))) {
-        return res.status(401).json({ message: "Email ou senha inválidos" });
+        return res.status(401).json({ message: "Email ou senha invÃ¡lidos" });
       }
 
       const token = generateToken(user.id);
@@ -437,11 +437,194 @@ export async function registerRoutes(
   });
 
   app.get("/api/auth/me", authMiddleware, async (req: AuthRequest, res) => {
-    const user = await storage.getUser(req.userId!);
+    const user = req.user ?? (await storage.getUser(req.userId!));
     if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado" });
+      return res.status(404).json({ message: "UsuÃ¡rio nÃ£o encontrado" });
     }
     res.json({ user: { ...user, password: undefined } });
+  });
+
+  /* ==================== ADMIN ==================== */
+
+  const requireAdmin = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const user = req.user ?? (await storage.getUser(req.userId!));
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "Acesso restrito" });
+    }
+    req.user = user;
+    return next();
+  };
+
+  const trilhaSchema = z.object({
+    name: z.string().trim().min(1, "Nome obrigatorio").max(140),
+    description: z.string().trim().max(1200).optional().nullable(),
+    category: z.string().trim().min(1, "Categoria obrigatoria").max(60),
+    thumbnailUrl: z.string().trim().optional().nullable(),
+    order: z.number().int().min(0).optional().nullable(),
+    startContentId: z.string().trim().optional().nullable(),
+  });
+
+  const contentOptionSchema = z.object({
+    label: z.string().trim().min(1, "Opcao obrigatoria"),
+    value: z.string().trim().optional().nullable(),
+    nextContentId: z.string().trim().optional().nullable(),
+    order: z.number().int().min(0).optional().nullable(),
+  });
+
+  const contentQuestionSchema = z.object({
+    prompt: z.string().trim().min(1, "Pergunta obrigatoria"),
+    type: z.string().trim().min(1).optional(),
+    order: z.number().int().min(0).optional().nullable(),
+    required: z.boolean().optional(),
+    options: z.array(contentOptionSchema).default([]),
+  });
+
+  const contentItemSchema = z.object({
+    trilhaId: z.string().trim().optional().nullable(),
+    title: z.string().trim().min(1, "Titulo obrigatorio"),
+    description: z.string().trim().optional().nullable(),
+    type: z.enum(["video", "text", "audio", "image", "file"]),
+    status: z.enum(["draft", "published"]).optional(),
+    payload: z.any().optional().nullable(),
+    nextContentId: z.string().trim().optional().nullable(),
+    order: z.number().int().min(0).optional().nullable(),
+    questions: z.array(contentQuestionSchema).optional(),
+  });
+
+  app.get("/api/admin/trilhas", authMiddleware, requireAdmin, async (_req, res) => {
+    const trilhas = await storage.getTrilhas();
+    res.json({ trilhas });
+  });
+
+  app.post("/api/admin/trilhas", authMiddleware, requireAdmin, async (req, res) => {
+    const parsed = trilhaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Dados invalidos" });
+    }
+
+    const created = await storage.createTrilha({
+      name: parsed.data.name,
+      description: parsed.data.description ?? null,
+      category: parsed.data.category,
+      thumbnailUrl: parsed.data.thumbnailUrl ?? null,
+      order: parsed.data.order ?? 0,
+      startContentId: parsed.data.startContentId ?? null,
+    });
+
+    res.json({ trilha: created });
+  });
+
+  app.patch("/api/admin/trilhas/:id", authMiddleware, requireAdmin, async (req, res) => {
+    const parsed = trilhaSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Dados invalidos" });
+    }
+
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Trilha invalida" });
+
+    const updated = await storage.updateTrilha(id, {
+      ...parsed.data,
+      order: parsed.data.order ?? undefined,
+      description: parsed.data.description ?? undefined,
+      thumbnailUrl: parsed.data.thumbnailUrl ?? undefined,
+      startContentId: parsed.data.startContentId ?? undefined,
+    });
+
+    if (!updated) return res.status(404).json({ message: "Trilha nao encontrada" });
+    res.json({ trilha: updated });
+  });
+
+  app.delete("/api/admin/trilhas/:id", authMiddleware, requireAdmin, async (req, res) => {
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Trilha invalida" });
+
+    const ok = await storage.deleteTrilha(id);
+    if (!ok) return res.status(404).json({ message: "Trilha nao encontrada" });
+    res.json({ ok: true });
+  });
+
+  app.get("/api/admin/conteudos", authMiddleware, requireAdmin, async (req, res) => {
+    const trilhaId = String((req.query as any)?.trilhaId ?? "").trim();
+    const status = String((req.query as any)?.status ?? "").trim();
+    const items = await storage.getContentItems(trilhaId || undefined, status || undefined);
+    res.json({ items });
+  });
+
+  app.get("/api/admin/conteudos/:id", authMiddleware, requireAdmin, async (req, res) => {
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Conteudo invalido" });
+
+    const item = await storage.getContentItem(id);
+    if (!item) return res.status(404).json({ message: "Conteudo nao encontrado" });
+
+    const questions = await storage.getContentQuestions(id);
+    res.json({ item, questions });
+  });
+
+  app.post("/api/admin/conteudos", authMiddleware, requireAdmin, async (req, res) => {
+    const parsed = contentItemSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Dados invalidos" });
+    }
+
+    const created = await storage.createContentItem({
+      trilhaId: parsed.data.trilhaId ?? null,
+      title: parsed.data.title,
+      description: parsed.data.description ?? null,
+      type: parsed.data.type,
+      status: parsed.data.status ?? "draft",
+      payload: parsed.data.payload ?? null,
+      nextContentId: parsed.data.nextContentId ?? null,
+      order: parsed.data.order ?? 0,
+    });
+
+    if (parsed.data.questions) {
+      await storage.replaceContentQuestions(created.id, parsed.data.questions);
+    }
+
+    const questions = parsed.data.questions ? await storage.getContentQuestions(created.id) : [];
+    res.json({ item: created, questions });
+  });
+
+  app.patch("/api/admin/conteudos/:id", authMiddleware, requireAdmin, async (req, res) => {
+    const parsed = contentItemSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Dados invalidos" });
+    }
+
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Conteudo invalido" });
+
+    const { questions, ...updates } = parsed.data;
+
+    const updated = await storage.updateContentItem(id, {
+      ...updates,
+      description: updates.description ?? undefined,
+      payload: updates.payload ?? undefined,
+      nextContentId: updates.nextContentId ?? undefined,
+      trilhaId: updates.trilhaId ?? undefined,
+      status: updates.status ?? undefined,
+      order: updates.order ?? undefined,
+    });
+
+    if (!updated) return res.status(404).json({ message: "Conteudo nao encontrado" });
+
+    if (questions) {
+      await storage.replaceContentQuestions(id, questions);
+    }
+
+    const currentQuestions = await storage.getContentQuestions(id);
+    res.json({ item: updated, questions: currentQuestions });
+  });
+
+  app.delete("/api/admin/conteudos/:id", authMiddleware, requireAdmin, async (req, res) => {
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Conteudo invalido" });
+
+    const ok = await storage.deleteContentItem(id);
+    if (!ok) return res.status(404).json({ message: "Conteudo nao encontrado" });
+    res.json({ ok: true });
   });
 
   /* ==================== DASHBOARD ==================== */
@@ -461,7 +644,7 @@ export async function registerRoutes(
     res.json({ suggestions });
   });
 
-  /* ==================== DIÁRIO ==================== */
+  /* ==================== DIÃRIO ==================== */
 
   app.get("/api/diario", authMiddleware, async (req: AuthRequest, res) => {
     const entries = await storage.getDiarioEntries(req.userId!);
@@ -478,7 +661,7 @@ export async function registerRoutes(
     res.json({ entry });
   });
 
-  /* ==================== CONSULTÓRIO ==================== */
+  /* ==================== CONSULTÃ“RIO ==================== */
 
   const history = new Map<string, { role: "user" | "assistant"; content: string }[]>();
 
@@ -910,7 +1093,128 @@ export async function registerRoutes(
     res.json({ mapa: created });
   });
 
-  /* ==================== VÍDEOS / TRILHAS ==================== */
+  /* ==================== CONTEUDOS / TRILHAS ==================== */
+
+  app.get("/api/trilhas", authMiddleware, async (_req: AuthRequest, res) => {
+    const trilhas = await storage.getTrilhas();
+    const items = await storage.getContentItems(undefined, "published");
+    const byTrilha = new Map<string, typeof items>();
+
+    for (const item of items) {
+      if (!item.trilhaId) continue;
+      const list = byTrilha.get(item.trilhaId) ?? [];
+      list.push(item);
+      byTrilha.set(item.trilhaId, list);
+    }
+
+    const payload = trilhas
+      .map((trilha) => {
+        const list = (byTrilha.get(trilha.id) ?? []).slice();
+        list.sort((a, b) => {
+          const orderDiff = (a.order ?? 0) - (b.order ?? 0);
+          if (orderDiff !== 0) return orderDiff;
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        });
+
+        const startId = trilha.startContentId ?? list[0]?.id ?? null;
+        return {
+          ...trilha,
+          itemsCount: list.length,
+          startContentId: startId,
+        };
+      })
+      .filter((trilha) => trilha.itemsCount > 0);
+
+    res.json({ trilhas: payload });
+  });
+
+  app.get("/api/trilhas/:id", authMiddleware, async (req: AuthRequest, res) => {
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Trilha invalida" });
+
+    const trilha = await storage.getTrilha(id);
+    if (!trilha) return res.status(404).json({ message: "Trilha nao encontrada" });
+
+    const items = await storage.getContentItems(id, "published");
+    const ordered = items.slice().sort((a, b) => {
+      const orderDiff = (a.order ?? 0) - (b.order ?? 0);
+      if (orderDiff !== 0) return orderDiff;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    const startContentId = trilha.startContentId ?? ordered[0]?.id ?? null;
+    res.json({ trilha: { ...trilha, startContentId }, items: ordered });
+  });
+
+  app.get("/api/conteudos/:id", authMiddleware, async (req: AuthRequest, res) => {
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Conteudo invalido" });
+
+    const item = await storage.getContentItem(id);
+    if (!item) return res.status(404).json({ message: "Conteudo nao encontrado" });
+
+    const user = req.user ?? (await storage.getUser(req.userId!));
+    const isAdmin = user?.role === "admin";
+    if (!isAdmin && item.status !== "published") {
+      return res.status(404).json({ message: "Conteudo nao encontrado" });
+    }
+
+    const questions = await storage.getContentQuestions(id);
+    res.json({ item, questions });
+  });
+
+  const contentAnswerSchema = z.object({
+    questionId: z.string().trim().min(1, "Pergunta obrigatoria"),
+    optionId: z.string().trim().optional().nullable(),
+    answerText: z.string().trim().optional().nullable(),
+  });
+
+  app.post("/api/conteudos/:id/answer", authMiddleware, async (req: AuthRequest, res) => {
+    const id = String(req.params.id ?? "").trim();
+    if (!id) return res.status(400).json({ message: "Conteudo invalido" });
+
+    const parsed = contentAnswerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0]?.message ?? "Dados invalidos" });
+    }
+
+    const item = await storage.getContentItem(id);
+    if (!item) return res.status(404).json({ message: "Conteudo nao encontrado" });
+    if (item.status !== "published") {
+      return res.status(404).json({ message: "Conteudo nao encontrado" });
+    }
+
+    const questions = await storage.getContentQuestions(id);
+    const question = questions.find((q) => q.id === parsed.data.questionId);
+    if (!question) {
+      return res.status(400).json({ message: "Pergunta invalida" });
+    }
+
+    const option = question.options.find((o) => o.id === parsed.data.optionId);
+    if (question.required && !option && !parsed.data.answerText) {
+      return res.status(400).json({ message: "Resposta obrigatoria" });
+    }
+
+    const answer = await storage.createContentAnswer({
+      userId: req.userId!,
+      contentItemId: id,
+      questionId: question.id,
+      optionId: option?.id ?? null,
+      answerText: parsed.data.answerText ?? null,
+    });
+
+    const nextId = option?.nextContentId ?? item.nextContentId ?? null;
+    let nextContent = null as any;
+    if (nextId) {
+      const candidate = await storage.getContentItem(nextId);
+      if (candidate && candidate.status === "published") {
+        nextContent = candidate;
+      }
+    }
+
+    res.json({ answer, nextContentId: nextContent?.id ?? null, nextContent });
+  });
+  /* ==================== VÃDEOS / TRILHAS ==================== */
 
   const isHttpUrl = (value: string) => {
     try {
@@ -1013,7 +1317,7 @@ export async function registerRoutes(
     res.json({ videos: videos.length > 0 ? videos : fallbackVideos });
   });
 
-  app.post("/api/videos", authMiddleware, async (req: AuthRequest, res) => {
+  app.post("/api/videos", authMiddleware, requireAdmin, async (req: AuthRequest, res) => {
     const parsed = createVideoSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Dados invalidos" });
@@ -1041,7 +1345,7 @@ export async function registerRoutes(
     res.json({ video: created });
   });
 
-  app.patch("/api/videos/:id", authMiddleware, async (req: AuthRequest, res) => {
+  app.patch("/api/videos/:id", authMiddleware, requireAdmin, async (req: AuthRequest, res) => {
     const id = String((req.params as any)?.id ?? "").trim();
     if (!id) return res.status(400).json({ message: "Video invalido" });
 
@@ -1085,7 +1389,7 @@ export async function registerRoutes(
     res.json({ video: updated });
   });
 
-  app.delete("/api/videos/:id", authMiddleware, async (req: AuthRequest, res) => {
+  app.delete("/api/videos/:id", authMiddleware, requireAdmin, async (req: AuthRequest, res) => {
     const id = String((req.params as any)?.id ?? "").trim();
     if (!id) return res.status(400).json({ message: "Video invalido" });
 
@@ -1097,3 +1401,4 @@ export async function registerRoutes(
 
   return httpServer;
 }
+

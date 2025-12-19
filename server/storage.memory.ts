@@ -44,15 +44,24 @@ class MemoryStorage {
     return [...this.users.values()].find((u) => u.username === username);
   }
 
-  async createUser(data: InsertUser): Promise<User> {
+  async createUser(data: InsertUser & { id?: string }): Promise<User> {
     const user: User = {
-      id: randomUUID(),
+      id: data.id ?? randomUUID(),
       createdAt: new Date(),
       ...data,
       avatarUrl: data.avatarUrl ?? null,
+      role: data.role ?? "user",
     };
     this.users.set(user.id, user);
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const existing = this.users.get(id);
+    if (!existing) return undefined;
+    const next = { ...existing, ...updates };
+    this.users.set(id, next);
+    return next;
   }
 
   /* ================= DASHBOARD ================= */

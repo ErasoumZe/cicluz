@@ -3,7 +3,17 @@ import { supabase } from "@/lib/supabase";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data, error } = await supabase.auth.getSession();
-  const token = error ? null : data.session?.access_token ?? null;
+  let session = error ? null : data.session ?? null;
+
+  if (session?.expires_at) {
+    const expiresAtMs = session.expires_at * 1000;
+    if (expiresAtMs - Date.now() < 60_000) {
+      const refreshed = await supabase.auth.refreshSession();
+      session = refreshed.data.session ?? session;
+    }
+  }
+
+  const token = session?.access_token ?? null;
   const headers: Record<string, string> = {};
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;

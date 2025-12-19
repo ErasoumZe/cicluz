@@ -1,20 +1,45 @@
 import {
   users, diarioEntries, questionnaireAnswers, iaReports, videos, agendaTasks, mapaState, dashboardState, trilhas,
+  contentItems, contentQuestions, contentOptions, contentAnswers,
   type User, type InsertUser, type DiarioEntry, type InsertDiarioEntry,
   type QuestionnaireAnswer, type InsertQuestionnaireAnswer, type IaReport, type InsertIaReport,
   type Video, type InsertVideo, type AgendaTask, type InsertAgendaTask,
   type MapaState, type InsertMapaState, type DashboardState, type InsertDashboardState,
-  type Trilha, type InsertTrilha
+  type Trilha, type InsertTrilha,
+  type ContentItem, type InsertContentItem,
+  type ContentQuestion, type InsertContentQuestion,
+  type ContentOption, type InsertContentOption,
+  type ContentAnswer, type InsertContentAnswer
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, and, gte, lte, inArray } from "drizzle-orm";
+
+type InsertUserWithId = InsertUser & { id?: string };
+
+export type ContentOptionInput = {
+  label: string;
+  value?: string | null;
+  nextContentId?: string | null;
+  order?: number | null;
+};
+
+export type ContentQuestionInput = {
+  prompt: string;
+  type?: string | null;
+  order?: number | null;
+  required?: boolean | null;
+  options: ContentOptionInput[];
+};
+
+export type ContentQuestionWithOptions = ContentQuestion & { options: ContentOption[] };
 
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: InsertUserWithId): Promise<User>;
+  updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
 
   // Diario
   getDiarioEntries(userId: string): Promise<DiarioEntry[]>;
@@ -33,6 +58,8 @@ export interface IStorage {
   // Videos
   getVideos(category?: string): Promise<Video[]>;
   createVideo(video: InsertVideo): Promise<Video>;
+  updateVideo(id: string, updates: Partial<Video>): Promise<Video | undefined>;
+  deleteVideo(id: string): Promise<boolean>;
 
   // Agenda Tasks
   getAgendaTasks(userId: string, date?: Date): Promise<AgendaTask[]>;
@@ -50,6 +77,22 @@ export interface IStorage {
   // Trilhas
   getTrilhas(category?: string): Promise<Trilha[]>;
   createTrilha(trilha: InsertTrilha): Promise<Trilha>;
+
+  getTrilha(id: string): Promise<Trilha | undefined>;
+  updateTrilha(id: string, data: Partial<Trilha>): Promise<Trilha | undefined>;
+  deleteTrilha(id: string): Promise<boolean>;
+
+  // Conteudo
+  getContentItems(trilhaId?: string, status?: string): Promise<ContentItem[]>;
+  getContentItem(id: string): Promise<ContentItem | undefined>;
+  createContentItem(item: InsertContentItem): Promise<ContentItem>;
+  updateContentItem(id: string, updates: Partial<ContentItem>): Promise<ContentItem | undefined>;
+  deleteContentItem(id: string): Promise<boolean>;
+  getContentQuestions(contentItemId: string): Promise<ContentQuestionWithOptions[]>;
+  replaceContentQuestions(contentItemId: string, questions: ContentQuestionInput[]): Promise<void>;
+
+  createContentAnswer(answer: InsertContentAnswer): Promise<ContentAnswer>;
+  getContentAnswers(userId: string, contentItemId?: string): Promise<ContentAnswer[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -69,9 +112,14 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(insertUser: InsertUserWithId): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated;
   }
 
   // Diario
@@ -130,6 +178,16 @@ export class DatabaseStorage implements IStorage {
   async createVideo(video: InsertVideo): Promise<Video> {
     const [created] = await db.insert(videos).values(video).returning();
     return created;
+  }
+
+  async updateVideo(id: string, updates: Partial<Video>): Promise<Video | undefined> {
+    const [updated] = await db.update(videos).set(updates).where(eq(videos.id, id)).returning();
+    return updated;
+  }
+
+  async deleteVideo(id: string): Promise<boolean> {
+    const deleted = await db.delete(videos).where(eq(videos.id, id)).returning({ id: videos.id });
+    return deleted.length > 0;
   }
 
   // Agenda Tasks
@@ -204,6 +262,150 @@ export class DatabaseStorage implements IStorage {
   async createTrilha(trilha: InsertTrilha): Promise<Trilha> {
     const [created] = await db.insert(trilhas).values(trilha).returning();
     return created;
+  }
+
+  async getTrilha(id: string): Promise<Trilha | undefined> {
+    const [trilha] = await db.select().from(trilhas).where(eq(trilhas.id, id));
+    return trilha;
+  }
+
+  async updateTrilha(id: string, data: Partial<Trilha>): Promise<Trilha | undefined> {
+    const [updated] = await db.update(trilhas).set(data).where(eq(trilhas.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTrilha(id: string): Promise<boolean> {
+    const deleted = await db.delete(trilhas).where(eq(trilhas.id, id)).returning({ id: trilhas.id });
+    return deleted.length > 0;
+  }
+
+  // Conteudo
+  async getContentItems(trilhaId?: string, status?: string): Promise<ContentItem[]> {
+    const conditions = [];
+    if (trilhaId) conditions.push(eq(contentItems.trilhaId, trilhaId));
+    if (status) conditions.push(eq(contentItems.status, status));
+
+    if (conditions.length > 0) {
+      return db
+        .select()
+        .from(contentItems)
+        .where(and(...conditions))
+        .orderBy(contentItems.order, contentItems.createdAt);
+    }
+
+    return db.select().from(contentItems).orderBy(contentItems.order, contentItems.createdAt);
+  }
+
+  async getContentItem(id: string): Promise<ContentItem | undefined> {
+    const [item] = await db.select().from(contentItems).where(eq(contentItems.id, id));
+    return item;
+  }
+
+  async createContentItem(item: InsertContentItem): Promise<ContentItem> {
+    const [created] = await db
+      .insert(contentItems)
+      .values({ ...item, updatedAt: new Date() })
+      .returning();
+    return created;
+  }
+
+  async updateContentItem(id: string, updates: Partial<ContentItem>): Promise<ContentItem | undefined> {
+    const [updated] = await db
+      .update(contentItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(contentItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteContentItem(id: string): Promise<boolean> {
+    const deleted = await db.delete(contentItems).where(eq(contentItems.id, id)).returning({ id: contentItems.id });
+    return deleted.length > 0;
+  }
+
+  async getContentQuestions(contentItemId: string): Promise<ContentQuestionWithOptions[]> {
+    const questions = await db
+      .select()
+      .from(contentQuestions)
+      .where(eq(contentQuestions.contentItemId, contentItemId))
+      .orderBy(contentQuestions.order);
+
+    if (questions.length === 0) return [];
+
+    const questionIds = questions.map((q) => q.id);
+    const options = await db
+      .select()
+      .from(contentOptions)
+      .where(inArray(contentOptions.questionId, questionIds))
+      .orderBy(contentOptions.order);
+
+    const grouped = new Map<string, ContentOption[]>();
+    for (const option of options) {
+      const list = grouped.get(option.questionId) ?? [];
+      list.push(option);
+      grouped.set(option.questionId, list);
+    }
+
+    return questions.map((question) => ({
+      ...question,
+      options: grouped.get(question.id) ?? [],
+    }));
+  }
+
+  async replaceContentQuestions(
+    contentItemId: string,
+    questions: ContentQuestionInput[],
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(contentQuestions).where(eq(contentQuestions.contentItemId, contentItemId));
+
+      for (const [index, question] of questions.entries()) {
+        const [createdQuestion] = await tx
+          .insert(contentQuestions)
+          .values({
+            contentItemId,
+            prompt: question.prompt,
+            type: question.type ?? "multiple_choice",
+            order: question.order ?? index,
+            required: question.required ?? true,
+          })
+          .returning();
+
+        const options = question.options ?? [];
+        if (options.length === 0) continue;
+
+        await tx.insert(contentOptions).values(
+          options.map((option, optIndex) => ({
+            questionId: createdQuestion.id,
+            label: option.label,
+            value: option.value ?? null,
+            nextContentId: option.nextContentId ?? null,
+            order: option.order ?? optIndex,
+          })),
+        );
+      }
+    });
+  }
+
+  async createContentAnswer(answer: InsertContentAnswer): Promise<ContentAnswer> {
+    const [created] = await db.insert(contentAnswers).values(answer).returning();
+    return created;
+  }
+
+  async getContentAnswers(userId: string, contentItemId?: string): Promise<ContentAnswer[]> {
+    if (contentItemId) {
+      return db
+        .select()
+        .from(contentAnswers)
+        .where(and(eq(contentAnswers.userId, userId), eq(contentAnswers.contentItemId, contentItemId)))
+        .orderBy(desc(contentAnswers.createdAt));
+    }
+
+    return db
+      .select()
+      .from(contentAnswers)
+      .where(eq(contentAnswers.userId, userId))
+      .orderBy(desc(contentAnswers.createdAt));
   }
 }
 

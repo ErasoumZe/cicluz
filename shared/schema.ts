@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name").notNull(),
   avatarUrl: text("avatar_url"),
+  role: text("role").notNull().default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -125,6 +126,59 @@ export const trilhas = pgTable("trilhas", {
   category: text("category").notNull(),
   thumbnailUrl: text("thumbnail_url"),
   order: integer("order").default(0),
+  startContentId: varchar("start_content_id"),
+});
+
+// Content items with optional branching logic
+export const contentItems = pgTable("content_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trilhaId: varchar("trilha_id").references(() => trilhas.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // video, text, audio, image, file
+  status: text("status").notNull().default("draft"), // draft, published
+  payload: jsonb("payload"),
+  nextContentId: varchar("next_content_id"),
+  order: integer("order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const contentQuestions = pgTable("content_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contentItemId: varchar("content_item_id")
+    .notNull()
+    .references(() => contentItems.id, { onDelete: "cascade" }),
+  prompt: text("prompt").notNull(),
+  type: text("type").notNull().default("multiple_choice"),
+  order: integer("order").default(0),
+  required: boolean("required").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const contentOptions = pgTable("content_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  questionId: varchar("question_id")
+    .notNull()
+    .references(() => contentQuestions.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  value: text("value"),
+  nextContentId: varchar("next_content_id").references(() => contentItems.id),
+  order: integer("order").default(0),
+});
+
+export const contentAnswers = pgTable("content_answers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  contentItemId: varchar("content_item_id")
+    .notNull()
+    .references(() => contentItems.id, { onDelete: "cascade" }),
+  questionId: varchar("question_id")
+    .notNull()
+    .references(() => contentQuestions.id, { onDelete: "cascade" }),
+  optionId: varchar("option_id").references(() => contentOptions.id),
+  answerText: text("answer_text"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Relations
@@ -135,6 +189,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   agendaTasks: many(agendaTasks),
   mapaState: many(mapaState),
   dashboardState: many(dashboardState),
+  contentAnswers: many(contentAnswers),
 }));
 
 export const diarioEntriesRelations = relations(diarioEntries, ({ one }) => ({
@@ -161,6 +216,31 @@ export const dashboardStateRelations = relations(dashboardState, ({ one }) => ({
   user: one(users, { fields: [dashboardState.userId], references: [users.id] }),
 }));
 
+export const trilhasRelations = relations(trilhas, ({ many }) => ({
+  contentItems: many(contentItems),
+}));
+
+export const contentItemsRelations = relations(contentItems, ({ one, many }) => ({
+  trilha: one(trilhas, { fields: [contentItems.trilhaId], references: [trilhas.id] }),
+  questions: many(contentQuestions),
+}));
+
+export const contentQuestionsRelations = relations(contentQuestions, ({ one, many }) => ({
+  contentItem: one(contentItems, { fields: [contentQuestions.contentItemId], references: [contentItems.id] }),
+  options: many(contentOptions),
+}));
+
+export const contentOptionsRelations = relations(contentOptions, ({ one }) => ({
+  question: one(contentQuestions, { fields: [contentOptions.questionId], references: [contentQuestions.id] }),
+}));
+
+export const contentAnswersRelations = relations(contentAnswers, ({ one }) => ({
+  user: one(users, { fields: [contentAnswers.userId], references: [users.id] }),
+  contentItem: one(contentItems, { fields: [contentAnswers.contentItemId], references: [contentItems.id] }),
+  question: one(contentQuestions, { fields: [contentAnswers.questionId], references: [contentQuestions.id] }),
+  option: one(contentOptions, { fields: [contentAnswers.optionId], references: [contentOptions.id] }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertDiarioEntrySchema = createInsertSchema(diarioEntries).omit({ id: true, createdAt: true });
@@ -171,6 +251,20 @@ export const insertAgendaTaskSchema = createInsertSchema(agendaTasks).omit({ id:
 export const insertMapaStateSchema = createInsertSchema(mapaState).omit({ id: true, updatedAt: true });
 export const insertDashboardStateSchema = createInsertSchema(dashboardState).omit({ id: true, updatedAt: true });
 export const insertTrilhaSchema = createInsertSchema(trilhas).omit({ id: true });
+export const insertContentItemSchema = createInsertSchema(contentItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertContentQuestionSchema = createInsertSchema(contentQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+export const insertContentOptionSchema = createInsertSchema(contentOptions).omit({ id: true });
+export const insertContentAnswerSchema = createInsertSchema(contentAnswers).omit({
+  id: true,
+  createdAt: true,
+});
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -191,6 +285,14 @@ export type InsertDashboardState = z.infer<typeof insertDashboardStateSchema>;
 export type DashboardState = typeof dashboardState.$inferSelect;
 export type InsertTrilha = z.infer<typeof insertTrilhaSchema>;
 export type Trilha = typeof trilhas.$inferSelect;
+export type InsertContentItem = z.infer<typeof insertContentItemSchema>;
+export type ContentItem = typeof contentItems.$inferSelect;
+export type InsertContentQuestion = z.infer<typeof insertContentQuestionSchema>;
+export type ContentQuestion = typeof contentQuestions.$inferSelect;
+export type InsertContentOption = z.infer<typeof insertContentOptionSchema>;
+export type ContentOption = typeof contentOptions.$inferSelect;
+export type InsertContentAnswer = z.infer<typeof insertContentAnswerSchema>;
+export type ContentAnswer = typeof contentAnswers.$inferSelect;
 
 // Auth schemas
 export const loginSchema = z.object({

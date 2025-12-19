@@ -23,6 +23,7 @@ const ALLOWLIST = new Set([
   // Supabase (server only)
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "ADMIN_EMAILS",
 ]);
 
 function stripQuotes(value: string) {

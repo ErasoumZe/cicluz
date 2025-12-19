@@ -7,6 +7,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -27,6 +28,8 @@ import {
   HiChatBubbleLeftRight,
   HiHome,
   HiMap,
+  HiPencilSquare,
+  HiSquares2X2,
 } from "react-icons/hi2";
 
 type NavItem = {
@@ -44,6 +47,11 @@ const navItems: NavItem[] = [
   { href: "/trilhas", label: "Conteudo", icon: HiAcademicCap },
 ];
 
+const adminNavItems: NavItem[] = [
+  { href: "/admin/trilhas", label: "Trilhas", icon: HiSquares2X2 },
+  { href: "/admin/conteudos", label: "Conteudos", icon: HiPencilSquare },
+];
+
 function getInitials(fullName: string | null | undefined) {
   const safe = (fullName ?? "").trim();
   if (!safe) return "?";
@@ -54,7 +62,7 @@ function getInitials(fullName: string | null | undefined) {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, role, logout } = useAuth();
 
   return (
     <Sidebar>
@@ -108,6 +116,52 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {role === "admin" ? (
+          <SidebarGroup className="mt-3">
+            <SidebarGroupLabel className="px-3 text-xs uppercase tracking-[0.2em] text-sidebar-foreground/60">
+              Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1.5">
+                {adminNavItems.map((item) => {
+                  const isActive = location === item.href;
+                  const IconComponent = item.icon;
+
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={cn(
+                          "group flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-all duration-200",
+                          isActive
+                            ? "bg-sidebar-accent/80 text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border/60"
+                            : "hover:bg-sidebar-accent/55"
+                        )}
+                      >
+                        <Link href={item.href}>
+                          <span
+                            className={cn(
+                              "grid h-9 w-9 place-items-center rounded-xl border border-sidebar-border/40 bg-sidebar-accent/40 text-sidebar-foreground/80 transition-all duration-200",
+                              isActive
+                                ? "bg-cicluz-gradient text-white border-transparent shadow-[0_10px_24px_hsl(var(--cicluz-purple)_/_0.25)]"
+                                : "group-hover:bg-sidebar-accent/60 group-hover:text-sidebar-foreground"
+                            )}
+                            aria-hidden="true"
+                          >
+                            <IconComponent className="h-5 w-5" />
+                          </span>
+                          <span className="text-sm font-medium">{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
 
         <div className="hidden md:block px-3 pb-3 pt-2">
           <div className="rounded-2xl bg-sidebar-accent/35 border border-sidebar-border/60 shadow-sm backdrop-blur-md p-2">

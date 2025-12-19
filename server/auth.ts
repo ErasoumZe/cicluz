@@ -1,10 +1,12 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { randomUUID } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import type { User } from "@shared/schema";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type User as SupabaseUser } from "@supabase/supabase-js";
 
 import { loadServerEnv } from "./env";
+import { storage } from "./storage";
 
 loadServerEnv();
 
@@ -25,6 +27,13 @@ const supabaseAdmin =
       })
     : null;
 
+const ADMIN_EMAILS = new Set(
+  String(process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
+);
+
 export interface AuthRequest extends Request {
   user?: User;
   userId?: string;
@@ -40,6 +49,88 @@ export async function comparePassword(password: string, hash: string): Promise<b
 
 export function generateToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+function getNameFromEmail(email: string) {
+  const base = email.split("@")[0] || "";
+  const cleaned = base.replace(/[._-]+/g, " ").trim();
+  if (!cleaned) return "Usuario";
+  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function safeTrim(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getSupabaseName(user: SupabaseUser, email: string) {
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const fromMeta =
+    safeTrim(meta.name) ||
+    safeTrim(meta.full_name);
+  if (fromMeta) return fromMeta;
+  return email ? getNameFromEmail(email) : "Usuario";
+}
+
+function getSupabaseAvatar(user: SupabaseUser) {
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const avatar = safeTrim(meta.avatar_url);
+  return avatar || null;
+}
+
+function isAdminEmail(email: string) {
+  if (!email) return false;
+  return ADMIN_EMAILS.has(email.toLowerCase());
+}
+
+async function createUniqueUsername(email: string) {
+  const baseUser = email.split("@")[0]?.toLowerCase() || "cicluz";
+  const sanitized = baseUser.replace(/[^a-z0-9_]/g, "").slice(0, 18) || "cicluz";
+  let username = sanitized;
+  let tries = 0;
+  while (await storage.getUserByUsername(username)) {
+    tries += 1;
+    username = `${sanitized}${String(tries).padStart(2, "0")}`.slice(0, 20);
+    if (tries >= 20) break;
+  }
+  return username;
+}
+
+async function ensureUserProfile(supabaseUser: SupabaseUser): Promise<User> {
+  const email = safeTrim(supabaseUser.email).toLowerCase();
+  const name = getSupabaseName(supabaseUser, email);
+  const avatarUrl = getSupabaseAvatar(supabaseUser);
+  const desiredRole = isAdminEmail(email) ? "admin" : "user";
+
+  const existing = await storage.getUser(supabaseUser.id);
+  if (existing) {
+    const updates: Partial<User> = {};
+    if (email && email !== existing.email) updates.email = email;
+    if (name && name !== existing.name) updates.name = name;
+    if (avatarUrl !== (existing.avatarUrl ?? null)) updates.avatarUrl = avatarUrl;
+    if (existing.role !== "admin" && desiredRole === "admin") {
+      updates.role = desiredRole;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const updated = await storage.updateUser(existing.id, updates);
+      return updated ?? existing;
+    }
+
+    return existing;
+  }
+
+  const username = await createUniqueUsername(email || randomUUID());
+  const password = await hashPassword(randomUUID());
+
+  return storage.createUser({
+    id: supabaseUser.id,
+    email: email || `${supabaseUser.id}@cicluz.local`,
+    username,
+    password,
+    name: name || "Usuario",
+    avatarUrl,
+    role: desiredRole,
+  });
 }
 
 function getErrorMeta(error: unknown) {
@@ -103,7 +194,8 @@ export async function authMiddleware(
       return res.status(500).json({ message: "Erro ao validar autenticacao" });
     }
 
-    req.userId = data.user.id;
+    req.user = await ensureUserProfile(data.user);
+    req.userId = req.user.id;
     next();
   } catch (err) {
     console.error("Supabase token validation failed:", err);

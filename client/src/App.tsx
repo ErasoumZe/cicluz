@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppBackground } from "@/components/layout/AppBackground";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { FloatingAudioPlayer } from "@/components/floating-audio-player";
 
 import AuthPage from "@/pages/auth";
 import TermsPage from "@/pages/terms";
@@ -19,9 +20,12 @@ import DashboardPage from "@/pages/dashboard";
 import ConsultorioPage from "@/pages/consultorio";
 import DiarioPage from "@/pages/diario";
 import TrilhasPage from "@/pages/trilhas";
+import TrilhaPage from "@/pages/trilha";
 import AgendaPage from "@/pages/agenda";
 import MapaPage from "@/pages/mapa";
 import NotFound from "@/pages/not-found";
+import AdminTrilhasPage from "@/pages/admin/trilhas";
+import AdminConteudosPage from "@/pages/admin/conteudos";
 
 function ProtectedRoute({
   component: Component,
@@ -48,6 +52,39 @@ function ProtectedRoute({
   return <Component />;
 }
 
+function AdminRoute({
+  component: Component,
+}: {
+  component: React.ComponentType;
+}) {
+  const { user, token, role, isLoading } = useAuth();
+
+  if (isLoading || (token && !user)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="space-y-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-cicluz-gradient animate-pulse mx-auto" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
+  if (role !== "admin") {
+    return <Redirect to="/" />;
+  }
+
+  return (
+    <AuthenticatedLayout>
+      <Component />
+    </AuthenticatedLayout>
+  );
+}
+
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { user, token, isLoading } = useAuth();
 
@@ -72,7 +109,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   } as React.CSSProperties;
 
   return (
-      <SidebarProvider style={style}>
+    <SidebarProvider style={style}>
       <AppBackground>
         <div className="flex h-dvh w-full">
           <AppSidebar />
@@ -89,6 +126,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <main className="flex-1 overflow-auto">{children}</main>
           </div>
         </div>
+        <FloatingAudioPlayer />
       </AppBackground>
     </SidebarProvider>
   );
@@ -133,6 +171,12 @@ function Router() {
         </AuthenticatedLayout>
       </Route>
 
+      <Route path="/trilhas/:id">
+        <AuthenticatedLayout>
+          <TrilhaPage />
+        </AuthenticatedLayout>
+      </Route>
+
       <Route path="/agenda">
         <AuthenticatedLayout>
           <AgendaPage />
@@ -143,6 +187,18 @@ function Router() {
         <AuthenticatedLayout>
           <MapaPage />
         </AuthenticatedLayout>
+      </Route>
+
+      <Route path="/admin">
+        <Redirect to="/admin/trilhas" />
+      </Route>
+
+      <Route path="/admin/trilhas">
+        <AdminRoute component={AdminTrilhasPage} />
+      </Route>
+
+      <Route path="/admin/conteudos">
+        <AdminRoute component={AdminConteudosPage} />
       </Route>
 
       <Route component={NotFound} />

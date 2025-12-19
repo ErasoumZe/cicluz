@@ -9,9 +9,12 @@ export interface AuthUser {
   avatarUrl?: string | null;
 }
 
+type UserRole = "admin" | "user";
+
 interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
+  role: UserRole | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem("cicluz-token"),
   );
+  const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const applySession = (session: Session) => {
@@ -63,6 +67,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("cicluz-token");
     setToken(null);
     setUser(null);
+    setRole(null);
+  };
+
+  const loadRole = async (accessToken: string) => {
+    try {
+      const res = await fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) {
+        setRole(null);
+        return;
+      }
+      const data = await res.json();
+      const nextRole = (data?.user?.role as UserRole) || null;
+      setRole(nextRole);
+    } catch {
+      setRole(null);
+    }
   };
 
   useEffect(() => {
@@ -79,16 +101,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       applySession(data.session);
+      await loadRole(data.session.access_token);
       setIsLoading(false);
     };
 
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         if (!active) return;
-        if (session) applySession(session);
-        else clearSession();
+        if (session) {
+          applySession(session);
+          await loadRole(session.access_token);
+        } else {
+          clearSession();
+        }
       },
     );
 
@@ -108,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!signIn.error && signIn.data.session) {
       applySession(signIn.data.session);
+      await loadRole(signIn.data.session.access_token);
       return;
     }
 
@@ -134,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     applySession(signUp.data.session);
+    await loadRole(signUp.data.session.access_token);
   };
 
   const logout = () => {
@@ -142,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, role, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -155,4 +184,3 @@ export function useAuth() {
   }
   return context;
 }
-
