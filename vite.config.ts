@@ -29,7 +29,11 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    // Vercel serves static output from dist/, while fullstack build expects dist/public.
+    outDir: path.resolve(
+      import.meta.dirname,
+      process.env.VERCEL ? "dist" : "dist/public",
+    ),
     emptyOutDir: true,
   },
   server: {
