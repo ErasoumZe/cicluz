@@ -17,7 +17,8 @@ if (!connectionString) {
 const parsedUrl = new URL(connectionString);
 const parsedPort = parsedUrl.port ? Number(parsedUrl.port) : 5432;
 const resolvedPort = Number.isFinite(parsedPort) ? parsedPort : 5432;
-const useSsl = parsedUrl.hostname.includes("supabase.co");
+const host = parsedUrl.hostname.toLowerCase();
+const useSsl = host.includes("supabase.co") || host.includes("supabase.com");
 const databaseName = parsedUrl.pathname.replace("/", "") || "postgres";
 
 export const pool = new Pool({
